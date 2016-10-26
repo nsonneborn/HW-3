@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 3"
-author: "WRITE YOUR NAME HERE"
+author: Nina Sonneborn
 output:
   html_document:
     toc: true
@@ -15,6 +15,7 @@ library(dplyr)
 library(readr)
 library(lubridate)
 library(Quandl)
+library(tidyr)
 ```
 
 
@@ -24,8 +25,8 @@ library(Quandl)
 Please indicate
 
 * Who you collaborated with:
-* Roughly how much time you spent on this HW so far:
-* The URL of the RPubs published URL [here](https://www.nhl.com/).
+* Roughly how much time you spent on this HW so far: 5 hours?
+* The URL of the RPubs published URL [here](http://rpubs.com/nsonneborn/hw3).
 * What gave you the most trouble:
 * Any comments you have:
 
@@ -56,10 +57,26 @@ correctly predicted.
 # To keep this exercise simple, let's remove the only 3 users (0.005% of users)
 # who did not list a height, define the outcome variable, and add an ID variable
 # to distinguish the users
+
+# Also adding thhe income_bracket column from HW-2 and redefining the job column to group jobs constituting less than 1% into "misc"
 profiles <- read_csv(file="profiles.csv") %>% 
   filter(!is.na(height)) %>% 
   mutate(is_female=ifelse(sex=='f', 1, 0)) %>% 
+  mutate(income_bracket = ifelse(income == -1, "unreported", 
+                                 ifelse(income <= 50000, "under_50k",
+                                        ifelse(income <= 150000, "50k_to_150k",
+                                               ifelse(income <= 10000000, 
+                                                      "150k_to_10mil", "over_10mil"))))) %>%
   tibble::rownames_to_column(var="id")
+
+test <- profiles %>% 
+  group_by(job) %>%
+  summarise(count = n()) %>%
+  ungroup()%>%
+  mutate(job_new =ifelse(count < 600, "misc", 
+                         ifelse(job == "", "unreported", job)))
+
+profiles <- left_join( profiles, test, by = "job") %>% select(-count)
 ```
 
 
@@ -81,6 +98,8 @@ to rate how well we performed.
 
 ```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
 set.seed(76)
+training <- sample_n(profiles, 2997)
+test <- anti_join(profiles, training, by = "id")
 
 ```
 
@@ -94,9 +113,19 @@ regression model to the `training` data. Assign this model to an R object called
 
 ```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
 
+predict_sex_model <- glm(is_female ~ orientation + income_bracket + job_new, data=training, family="binomial")
+
+training_phats<- predict(predict_sex_model, data=training, type="response")
+
+training_predictions <- training %>% 
+  select(income_bracket, job_new, orientation, is_female) %>%
+  mutate(phat= training_phats) %>% mutate(predicted_is_female = ifelse(phat < .5, 0, 1))
+
+summarise(training_predictions, percent_correct = mean(is_female == predicted_is_female)) %>%
+  knitr::kable(digits = 4)
 ```
 
-
+The prediction model worked on 64.56% of predictions.
 
 #### c)
 
@@ -107,18 +136,23 @@ for each users' sex, then rate how well the model performs on the `test` data.
 type="response")` does? The help file is located in `?predict.glm`
 
 ```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
+predictions <- predict(predict_sex_model, newdata=test, type="response")
+test <- test %>% select(income_bracket, job_new, orientation, is_female) %>% 
+  mutate(phat= predictions) %>% mutate(predicted_is_female = ifelse(phat < .5, 0, 1))
+
+summarise(test, percent_correct = mean(is_female == predicted_is_female)) %>%
+  knitr::kable(digits = 4)
 
 ```
 
-
+The prediction model worked on 65.23% of predictions.
 
 #### d)
 
 Did the model perform better on the `training` data or the `test` data? Why
 do you think that is?
 
-
-
+The model performed better on the test set by less than 1% of predictions. This may be due to the size of the data set.
 
 
 
@@ -135,9 +169,18 @@ Let the reference currency be US dollars. Analyze these results and provide
 insight to a foreign currency exchanger.
 
 ```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
+bitcoin <- Quandl("BAVERAGE/USD")
+gold <- Quandl("BUNDESBANK/BBK01_WT5511")
 
+gold_clipped <- filter(gold, as.numeric(year(Date)) >= 2010)
+ggplot() + 
+  geom_line(data =bitcoin, aes(x = Date, y = Bid, col = "bicoin"))  + 
+  geom_line(data = gold_clipped, aes(x =  Date, y = Value, col = "gold")) +
+  scale_y_log10() +
+  labs(y = "log(US Dollars)", title = "Relative change in price of Bitcoin and Gold")
 ```
 
+In the past couple of years, bitcoin has had more day-to-day price growth. The price of gold hasn't changed all that much, relatively speaking. A foreign currency exchanger might be more interested in bitcoin, based off of this analysis.
 
 
 
@@ -177,6 +220,20 @@ the "graveyard shift" during the academic year? Define
 * the academic year as September through May (inclusive)
 
 ```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
+jukebox <- mutate(jukebox, date_time1 = parse_date_time(date_time, "a b d T y"))
+
+academic_year <- c(01, 02, 03, 04, 05, 09, 10, 11, 12)
+graveyard_shift <- c(00, 01, 02, 03, 04, 05, 06, 07, 08)
+
+jukebox %>% 
+  filter(hour(date_time1) %in% graveyard_shift & 
+           as.numeric(month(date_time1)) %in% academic_year) %>%
+  group_by(artist) %>%
+  summarise( count = n()) %>%
+  arrange(desc(count)) %>%
+  top_n(10) %>%
+  knitr::kable()
+
 
 ```
 
