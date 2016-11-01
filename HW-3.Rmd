@@ -16,6 +16,7 @@ library(readr)
 library(lubridate)
 library(Quandl)
 library(tidyr)
+library(quantmod)
 ```
 
 
@@ -115,11 +116,16 @@ regression model to the `training` data. Assign this model to an R object called
 
 predict_sex_model <- glm(is_female ~ orientation + income_bracket + job_new, data=training, family="binomial")
 
-training_phats<- predict(predict_sex_model, data=training, type="response")
+training_phats <- predict(predict_sex_model, data=training, type="response")
 
 training_predictions <- training %>% 
   select(income_bracket, job_new, orientation, is_female) %>%
   mutate(phat= training_phats) %>% mutate(predicted_is_female = ifelse(phat < .5, 0, 1))
+
+
+training_predictions %>% summarise(sum(is.na(phat)), sum(is.na(predicted_is_female)))
+
+# I am not seeing the error you are describing... training_phats has length 2997
 
 summarise(training_predictions, percent_correct = mean(is_female == predicted_is_female)) %>%
   knitr::kable(digits = 4)
@@ -172,12 +178,24 @@ insight to a foreign currency exchanger.
 bitcoin <- Quandl("BAVERAGE/USD")
 gold <- Quandl("BUNDESBANK/BBK01_WT5511")
 
-gold_clipped <- filter(gold, as.numeric(year(Date)) >= 2010)
+gold_clipped <- filter(gold, as.numeric(year(Date)) >= 2014)
+bitcoin_clipped <- filter(bitcoin, as.numeric(year(Date)) >= 2014)
 ggplot() + 
-  geom_line(data =bitcoin, aes(x = Date, y = Bid, col = "bicoin"))  + 
+  geom_line(data =bitcoin_clipped, aes(x = Date, y = Bid, col = "bicoin"))  + 
   geom_line(data = gold_clipped, aes(x =  Date, y = Value, col = "gold")) +
   scale_y_log10() +
   labs(y = "log(US Dollars)", title = "Relative change in price of Bitcoin and Gold")
+
+
+bitcoin1 <- bitcoin_clipped %>% mutate(percent_change = Delt(Bid)) # should I be looking at Bid, Ask, or 24 Average??
+
+gold1 <- gold_clipped %>% mutate(percent_change = Delt(Value))
+
+ggplot() +
+  geom_line(data = bitcoin1, aes(x = Date, y = percent_change, col = "bitcoin")) +
+  geom_line(data = gold1, aes(x = Date, y=percent_change, col ="gold")) +
+  labs(y = "relative change (USD)", title = "Relative volatility of bitcoin and gold")
+
 ```
 
 In the past couple of years, bitcoin has had more day-to-day price growth. The price of gold hasn't changed all that much, relatively speaking. A foreign currency exchanger might be more interested in bitcoin, based off of this analysis.
@@ -233,6 +251,7 @@ jukebox %>%
   arrange(desc(count)) %>%
   top_n(10) %>%
   knitr::kable()
+
 
 
 ```
