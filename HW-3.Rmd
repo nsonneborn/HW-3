@@ -241,16 +241,20 @@ jukebox <- mutate(jukebox, date_time1 = parse_date_time(date_time, "a b d T y"))
 academic_year <- c(01, 02, 03, 04, 05, 09, 10, 11, 12)
 graveyard_shift <- c(00, 01, 02, 03, 04, 05, 06, 07, 08)
 
-jukebox %>% 
+top_10 <- jukebox %>% 
   filter(hour(date_time1) %in% graveyard_shift & 
            as.numeric(month(date_time1)) %in% academic_year) %>%
   group_by(artist) %>%
   summarise( count = n()) %>%
   arrange(desc(count)) %>%
-  top_n(10) %>%
-  knitr::kable()
+  top_n(10) 
 
+top_10 %>% knitr::kable()
 
+ggplot(top_10, aes(x = reorder(artist, -count), y = count)) + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Top artists in the graveyard shift", x = "", y = "Plays")
 
 ```
 
