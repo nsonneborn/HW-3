@@ -158,7 +158,7 @@ The prediction model worked on 65.23% of predictions.
 Did the model perform better on the `training` data or the `test` data? Why
 do you think that is?
 
-The model performed better on the test set by less than 1% of predictions. This may be due to the size of the data set.
+The model performed better on the test set by less than 1% of predictions. This shows that the model is not very affected by the variability between the sets. If I were to reselect training/test sets, I expect that on most runs the test set does better, but usually they are pretty close in percent correct.
 
 
 
@@ -178,17 +178,15 @@ insight to a foreign currency exchanger.
 bitcoin <- Quandl("BAVERAGE/USD")
 gold <- Quandl("BUNDESBANK/BBK01_WT5511")
 
-gold_clipped <- filter(gold, as.numeric(year(Date)) >= 2014)
-bitcoin_clipped <- filter(bitcoin, as.numeric(year(Date)) >= 2014)
+gold_clipped <- filter(gold, as.numeric(year(Date)) >= 2010)
 ggplot() + 
-  geom_line(data =bitcoin_clipped, aes(x = Date, y = Bid, col = "bicoin"))  + 
+  geom_line(data =bitcoin, aes(x = Date, y = `24h Average`, col = "bicoin"))  + 
   geom_line(data = gold_clipped, aes(x =  Date, y = Value, col = "gold")) +
   scale_y_log10() +
   labs(y = "log(US Dollars)", title = "Relative change in price of Bitcoin and Gold")
 
 
-bitcoin1 <- bitcoin_clipped %>% mutate(percent_change = Delt(Bid)) # should I be looking at Bid, Ask, or 24 Average??
-
+bitcoin1 <- bitcoin %>% mutate(percent_change = Delt(`24h Average`)) 
 gold1 <- gold_clipped %>% mutate(percent_change = Delt(Value))
 
 ggplot() +
@@ -198,7 +196,7 @@ ggplot() +
 
 ```
 
-In the past couple of years, bitcoin has had more day-to-day price growth. The price of gold hasn't changed all that much, relatively speaking. A foreign currency exchanger might be more interested in bitcoin, based off of this analysis.
+In the past couple of years, bitcoin has had more day-to-day price variation. The price of gold hasn't changed all that much, relatively speaking. A foreign currency exchanger might be more interested in bitcoin, based off of this analysis.
 
 
 
